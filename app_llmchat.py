@@ -4,7 +4,7 @@ from streamlit_chat import message
 import os
 import PyPDF2
 from io import StringIO
-from langchain import llms
+from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader
@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Setting page title and header
-st.set_page_config(page_title="MathGenieBot", page_icon=":robot_face:")
-st.markdown("<h1 style='text-align: center; font-size: 40px;'>MathGenieBot 🏂</h1>", unsafe_allow_html=True)
-st.markdown("<h2 style='text-align: center; font-size: 28px;'>Unleashing the Math Power of Kids 😬</h2>", unsafe_allow_html=True)
+st.set_page_config(page_title="GenieBot", page_icon=":robot_face:")
+st.markdown("<h1 style='text-align: center; font-size: 40px;'>GenieBot 🏂</h1>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; font-size: 28px;'>Unleashing the Learning Power of Kids 😬</h2>", unsafe_allow_html=True)
 
 # Initiate openai client
 client = OpenAI(
@@ -44,6 +44,8 @@ if 'total_tokens' not in st.session_state:
     st.session_state['total_tokens'] = []
 if 'total_cost' not in st.session_state:
     st.session_state['total_cost'] = 0.0
+if 'temperature' not in st.session_state:
+    st.session_state['temperature'] = []
 
 # Sidebar - let user choose model, show total cost of current conversation, and let user clear the current conversation
 st.sidebar.title("Sidebar")
@@ -51,6 +53,7 @@ model_name = st.sidebar.radio("Choose a model:", ("gpt-3.5-turbo", "gpt-4"))
 data_name = st.sidebar.radio(
     "Select data", ("Provide in Text Box", "Uploaded Files"), index=None)
 uploaded_files = st.sidebar.file_uploader("Choose your files", type="pdf")
+temperature = st.sidebar.slider("Creativity of model", min_value=0.0, max_value=1.0, value=None, step=0.1)
 counter_placeholder = st.sidebar.empty()
 counter_placeholder.write(
     f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
@@ -58,13 +61,13 @@ clear_button = st.sidebar.button("Clear Conversation", key="clear")
 
 # Map model names to OpenAI model IDs
 if model_name == "gpt-3.5-turbo":
-    llm = llms.OpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
+    llm = ChatOpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
                       model_name="gpt-3.5-turbo",
-                      temperature=0.1)
+                      temperature=temperature)
 else:
-    llm = llms.OpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
+    llm = ChatOpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
                       model_name="gpt-4",
-                      temperature=0.1)
+                      temperature=temperature)
 
 # Vectordb embedding model
 embedding_model = "sentence-transformers/all-mpnet-base-v2"
@@ -88,6 +91,7 @@ if clear_button:
     st.session_state['cost'] = []
     st.session_state['total_cost'] = 0.0
     st.session_state['total_tokens'] = []
+    st.session_state['temperature'] = []
     counter_placeholder.write(
         f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
 
@@ -98,13 +102,10 @@ splitter = RecursiveCharacterTextSplitter(separators=["\n"],
                                           chunk_overlap=50)
 
 # Build a retriever over uploaded files
-
-
 def load_files(file_obj):
     loader = PyPDFLoader(file_obj)
     pdf_docs = loader.load()
     return pdf_docs
-
 
 # Re-build retriever
 chromadb = Chroma("Initial", embeddings)
@@ -114,6 +115,7 @@ if data_name == "Uploaded Files":
         pdf_text = ""
         for page in pdf_reader.pages:
             pdf_text += page.extract_text() + "\n"
+        st.write(pdf_text)
         pdf_docs = [Document(page_content=x)
                     for x in splitter.split_text(pdf_text)]
         splits = splitter.split_documents(pdf_docs)
@@ -160,7 +162,7 @@ def chat_completion(prompt):
     # response_object = client.completions.create(
     response_object = client.chat.completions.create(
         model=model_name,
-        temperature=0.1,
+        temperature=temperature,
         messages=st.session_state['messages']
     )
     # st.write(response_object)
@@ -178,7 +180,6 @@ def chat_completion(prompt):
     return response, total_tokens, prompt_tokens, completion_tokens
     # return response_object
 
-
 # container for chat history
 response_container = st.container()
 # container for text box
@@ -192,18 +193,21 @@ with container:
     if submit_button and user_input:
         if data_name != "Provide in Text Box":
             response = generate_response(user_input)
-        else:
+        elif data_name == "Uploaded Files":
             output, total_tokens, prompt_tokens, completion_tokens = chat_completion(
                 user_input)
             # response_object = chat_completion(user_input)
+        else:
+            st.write("Please select data.")
         st.session_state['past'].append(user_input)
         st.session_state['generated'].append(output)
         st.session_state['model_name'].append(model_name)
         st.session_state['data_name'].append(data_name)                                         
         st.session_state['total_tokens'].append(total_tokens)
+        st.session_state['temperature'].append(temperature)
 
         # from https://openai.com/pricing#language-models
-        if model_name == "GPT-3.5":
+        if model_name == "gpt-3.5-turbo":
             cost = total_tokens * 0.002 / 1000
         else:
             cost = (prompt_tokens * 0.03 + completion_tokens * 0.06) / 1000
@@ -218,6 +222,6 @@ if st.session_state['generated']:
                     is_user=True, key=str(i) + '_user')
             message(st.session_state["generated"][i], key=str(i))
             st.write(
-                f"Model used: {st.session_state['model_name'][i]}; Number of tokens: {st.session_state['total_tokens'][i]}; Cost: ${st.session_state['cost'][i]:.5f}; Data used: {st.session_state['data_name'][i]}")
+                f"Model used: {st.session_state['model_name'][i]}; Number of tokens: {st.session_state['total_tokens'][i]}; Cost: ${st.session_state['cost'][i]:.5f}; Data used: {st.session_state['data_name'][i]}; Temperature: {st.session_state['temperature'][i]}")
             counter_placeholder.write(
                 f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
