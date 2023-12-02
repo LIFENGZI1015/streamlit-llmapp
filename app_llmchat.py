@@ -3,7 +3,11 @@ import streamlit as st
 from streamlit_chat import message
 import os
 import PyPDF2
-from io import StringIO
+from PIL import Image
+import pytesseract
+import easyocr
+from io import StringIO, BytesIO
+import imageio.v3 as iio
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -123,17 +127,46 @@ def load_unstructured_files(file_path):
     unstructured_data = loader.load()
     return unstructured_data
 
+# from file objects
+class MyFileObject:
+    def read(size:int=-1):
+        return bytes_image
+
+    def close():
+        return  # nothing to do
+
 # Re-build retriever
 if data_name == "Uploaded Files":
     if uploaded_files is not None:
-        pdf_reader = PyPDF2.PdfReader(uploaded_files)
-        pdf_text = ""
-        for page in pdf_reader.pages:
-            pdf_text += page.extract_text() + "\n"
-        st.write(pdf_text)
-        pdf_docs = [Document(page_content=x)
-                    for x in splitter.split_text(pdf_text)]
-        splits = splitter.split_documents(pdf_docs)
+        try:
+            pdf_reader = PyPDF2.PdfReader(uploaded_files)
+            loaded_text = ""
+            for page in pdf_reader.pages:
+                loaded_text += page.extract_text() + "\n"
+        except:
+            try:
+                # bytes_data = uploaded_files.getvalue()
+                # bytes_image = iio.imwrite("<bytes>", frames)
+                stringio = StringIO(uploaded_files.getvalue().decode("utf-8"))
+                string_data = stringio.read()
+                st.write(string_data)
+                # byte_stream = BytesIO(stringio)
+                # frames = iio.imread(byte_stream, index=None)
+                # image = Image.open(BytesIO(uploaded_files))
+                # loaded_text = pytesseract.image_to_string(image)
+                # reader = easyocr.Reader(['en'])
+                # ocr_result = reader.readtext(image)
+                # st.write(ocr_result)
+                # loaded_text = ""
+                # for detection in ocr_result:
+                    # loaded_text += detection[1]
+            except:
+                st.write("Uploaded files in PDF, PNG, JPG JPEG only.")
+                loaded_text = ""
+        st.write(loaded_text)
+        loaded_docs = [Document(page_content=x)
+                    for x in splitter.split_text(loaded_text)]
+        splits = splitter.split_documents(loaded_docs)
         chromadb = Chroma.from_documents(
             documents=splits, embedding=embeddings, collection_name="uploaded_docs")
         retriever = chromadb.as_retriever()
