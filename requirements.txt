@@ -16,3 +16,5 @@ pillow==10.1.0
 pytesseract==0.3.10
 easyocr==1.7.1
 imageio==2.33.0
+black==23.12.1
+pylint==3.0.3

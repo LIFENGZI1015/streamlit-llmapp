@@ -6,12 +6,18 @@ import PyPDF2
 from PIL import Image
 import pytesseract
 import easyocr
+import codecs
 from io import StringIO, BytesIO
 import imageio.v3 as iio
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader, UnstructuredFileLoader
+from langchain.document_loaders import (
+    PyPDFLoader,
+    DirectoryLoader,
+    TextLoader,
+    UnstructuredFileLoader,
+)
 from langchain.document_loaders.image import UnstructuredImageLoader
 from langchain.vectorstores import Chroma
 from langchain.prompts import PromptTemplate
@@ -19,121 +25,139 @@ from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.document import Document
 from langchain.callbacks import get_openai_callback
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Setting page title and header
 st.set_page_config(page_title="GenieBot", page_icon=":robot_face:")
-st.markdown("<h1 style='text-align: center; font-size: 40px;'>GenieBot 🏂</h1>", unsafe_allow_html=True)
-st.markdown("<h2 style='text-align: center; font-size: 28px;'>Unleashing the Learning Power of Kids 😬</h2>", unsafe_allow_html=True)
+st.markdown(
+    "<h1 style='text-align: center; font-size: 40px;'>GenieBot 🏂</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<h2 style='text-align: center; font-size: 28px;'>Unleashing the Learning Power of Kids 😬</h2>",
+    unsafe_allow_html=True,
+)
 
 # Initiate openai client
 client = OpenAI(
-    api_key=os.environ.get('OPENAI_API_KEY'),
+    api_key=os.environ.get("OPENAI_API_KEY"),
 )
 
 # Initialise session state variables
-if 'generated' not in st.session_state:
-    st.session_state['generated'] = []
-if 'past' not in st.session_state:
-    st.session_state['past'] = []
-if 'messages' not in st.session_state:
-    st.session_state['messages'] = [
+if "generated" not in st.session_state:
+    st.session_state["generated"] = []
+if "past" not in st.session_state:
+    st.session_state["past"] = []
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [
         {"role": "system", "content": "You are a helpful assistant."}
     ]
-if 'model_name' not in st.session_state:
-    st.session_state['model_name'] = []
-if 'data_name' not in st.session_state:
-    st.session_state['data_name'] = []
-if 'cost' not in st.session_state:
-    st.session_state['cost'] = []
-if 'total_tokens' not in st.session_state:
-    st.session_state['total_tokens'] = []
-if 'total_cost' not in st.session_state:
-    st.session_state['total_cost'] = 0.0
-if 'temperature' not in st.session_state:
-    st.session_state['temperature'] = []
+if "model_name" not in st.session_state:
+    st.session_state["model_name"] = []
+if "data_name" not in st.session_state:
+    st.session_state["data_name"] = []
+if "cost" not in st.session_state:
+    st.session_state["cost"] = []
+if "total_tokens" not in st.session_state:
+    st.session_state["total_tokens"] = []
+if "total_cost" not in st.session_state:
+    st.session_state["total_cost"] = 0.0
+if "temperature" not in st.session_state:
+    st.session_state["temperature"] = []
 
 # Sidebar - let user choose model, show total cost of current conversation, and let user clear the current conversation
 st.sidebar.title("Sidebar")
 model_name = st.sidebar.radio("Choose a model:", ("gpt-3.5-turbo", "gpt-4"))
 data_name = st.sidebar.radio(
-    "Select data", ("Provide in Text Box", "Uploaded Files"), index=None)
-uploaded_files = st.sidebar.file_uploader("Choose your files", type=["pdf", "png", "jpg"])
-llm_temperature = st.sidebar.slider("Creativity of model", min_value=0.0, max_value=1.0, value=None, step=0.1)
+    "Select data", ("Provide in Text Box", "Uploaded Files"), index=None
+)
+uploaded_files = st.sidebar.file_uploader(
+    "Choose your files", type=["pdf", "png", "jpg"]
+)
+llm_temperature = st.sidebar.slider(
+    "Creativity of model", min_value=0.0, max_value=1.0, value=None, step=0.1
+)
 counter_placeholder = st.sidebar.empty()
 counter_placeholder.write(
-    f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
+    f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
+)
 clear_button = st.sidebar.button("Clear Conversation", key="clear")
 
 # Map model names to OpenAI model IDs
 if model_name == "gpt-3.5-turbo":
-    llm = ChatOpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
-                      model_name="gpt-3.5-turbo",
-                      temperature=llm_temperature)
+    llm = ChatOpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        model_name="gpt-3.5-turbo",
+        temperature=llm_temperature,
+    )
 else:
-    llm = ChatOpenAI(api_key=os.environ.get('OPENAI_API_KEY'),
-                      model_name="gpt-4",
-                      temperature=llm_temperature)
+    llm = ChatOpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        model_name="gpt-4",
+        temperature=llm_temperature,
+    )
 
 # Vectordb embedding model
 embedding_model = "sentence-transformers/all-mpnet-base-v2"
-model_kwargs = {'device': 'cpu'}
-encode_kwargs = {'normalize_embeddings': False}
+model_kwargs = {"device": "cpu"}
+encode_kwargs = {"normalize_embeddings": False}
 embeddings = HuggingFaceEmbeddings(
-    model_name=embedding_model,
-    model_kwargs=model_kwargs,
-    encode_kwargs=encode_kwargs
+    model_name=embedding_model, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
 )
 
 # Reset everything
 if clear_button:
-    st.session_state['generated'] = []
-    st.session_state['past'] = []
-    st.session_state['messages'] = [
+    st.session_state["generated"] = []
+    st.session_state["past"] = []
+    st.session_state["messages"] = [
         {"role": "system", "content": "You are a helpful assistant."}
     ]
-    st.session_state['model_name'] = []
-    st.session_state['data_name'] = []
-    st.session_state['cost'] = []
-    st.session_state['total_cost'] = 0.0
-    st.session_state['total_tokens'] = []
-    st.session_state['temperature'] = []
+    st.session_state["model_name"] = []
+    st.session_state["data_name"] = []
+    st.session_state["cost"] = []
+    st.session_state["total_cost"] = 0.0
+    st.session_state["total_tokens"] = []
+    st.session_state["temperature"] = []
     counter_placeholder.write(
-        f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
+        f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
+    )
     try:
         Chroma.delect_collection("uploaded_docs")
     except:
         st.write("No Chroma collection is deleted.")
 
 # Split into smaller chunks
-splitter = RecursiveCharacterTextSplitter(separators=["\n"],
-                                          keep_separator=False,
-                                          chunk_size=1000,
-                                          chunk_overlap=50)
+splitter = RecursiveCharacterTextSplitter(
+    separators=["\n"], keep_separator=False, chunk_size=1000, chunk_overlap=50
+)
+
 
 # Build a retriever over uploaded files
 def load_files(file_path):
-    loader = PyPDFLoader(file_obj)
+    loader = PyPDFLoader(file_path)
     pdf_docs = loader.load()
     return pdf_docs
+
 
 def load_images(file_path):
     loader = UnstructuredImageLoader(file_path)
     img_data = loader.load()
     return img_data
 
+
 def load_unstructured_files(file_path):
     loader = UnstructuredFileLoader(file_path, mode="elements")
     unstructured_data = loader.load()
     return unstructured_data
 
-# from file objects
-class MyFileObject:
-    def read(size:int=-1):
-        return bytes_image
 
-    def close():
-        return  # nothing to do
+# from file objects
+# class MyFileObject:
+#     def read(size:int=-1):
+#         return bytes_image
+#     def close():
+#         return  # nothing to do
 
 # Re-build retriever
 if data_name == "Uploaded Files":
@@ -147,31 +171,41 @@ if data_name == "Uploaded Files":
             try:
                 # bytes_data = uploaded_files.getvalue()
                 # bytes_image = iio.imwrite("<bytes>", frames)
-                stringio = StringIO(uploaded_files.getvalue().decode("utf-8"))
-                string_data = stringio.read()
-                st.write(string_data)
+                stringio = StringIO(
+                    uploaded_files.getvalue().decode("utf-8", errors="ignore")
+                )
+                # st.write(stringio)
+                loaded_text = stringio.read()
+                # st.write(loaded_text)
+                # b_string = uploaded_files.getvalue()
+                # st.write(b_string)
+                # loaded_text = codecs.decode(b_string, 'UTF-8', errors='ignore')
                 # byte_stream = BytesIO(stringio)
+                ## pytesseract and easyocr accept stinrg path of image
                 # frames = iio.imread(byte_stream, index=None)
                 # image = Image.open(BytesIO(uploaded_files))
                 # loaded_text = pytesseract.image_to_string(image)
                 # reader = easyocr.Reader(['en'])
-                # ocr_result = reader.readtext(image)
+                # ocr_result = reader.readtext(uploaded_files)
                 # st.write(ocr_result)
                 # loaded_text = ""
                 # for detection in ocr_result:
-                    # loaded_text += detection[1]
+                # loaded_text += detection[1] + " "
             except:
                 st.write("Uploaded files in PDF, PNG, JPG JPEG only.")
                 loaded_text = ""
         st.write(loaded_text)
-        loaded_docs = [Document(page_content=x)
-                    for x in splitter.split_text(loaded_text)]
+        loaded_docs = [
+            Document(page_content=x) for x in splitter.split_text(loaded_text)
+        ]
         splits = splitter.split_documents(loaded_docs)
         chromadb = Chroma.from_documents(
-            documents=splits, embedding=embeddings, collection_name="uploaded_docs")
+            documents=splits, embedding=embeddings, collection_name="uploaded_docs"
+        )
         retriever = chromadb.as_retriever()
         st.write(
-            "Chatbot is reading your files and you can start talking to your data...")
+            "Chatbot is reading your files and you can start talking to your data..."
+        )
     else:
         st.write("Please upload your files.")
 elif data_name == "Provide in Text Box":
@@ -187,37 +221,38 @@ Context: {context}
 Question: {question}
 Answer:
 """
-prompt_template = PromptTemplate(template=template,
-                        input_variables=["context", "question"])
+prompt_template = PromptTemplate(
+    template=template, input_variables=["context", "question"]
+)
+
 
 # Generate a response over uploaded data
 def generate_response(prompt, retriever, llm):
-    st.session_state['messages'].append({"role": "user", "content": prompt})
+    st.session_state["messages"].append({"role": "user", "content": prompt})
     # Set up a RAG chain
     rag_chain = (
-        {"context": retriever, "question": RunnablePassthrough()} | prompt_template | llm
-        )
+        {"context": retriever, "question": RunnablePassthrough()}
+        | prompt_template
+        | llm
+    )
     with get_openai_callback() as call_back:
         response_object = rag_chain.invoke(prompt)
     response = response_object.content
-    st.session_state['messages'].append(
-        {"role": "assistant", "content": response})
+    st.session_state["messages"].append({"role": "assistant", "content": response})
     return response, call_back
+
 
 # Generate a response over context in text box
 def chat_completion(prompt, temperature):
-    st.session_state['messages'].append({"role": "user", "content": prompt})
+    st.session_state["messages"].append({"role": "user", "content": prompt})
     # response_object = client.completions.create(
     response_object = client.chat.completions.create(
-        model=model_name,
-        temperature=temperature,
-        messages=st.session_state['messages']
+        model=model_name, temperature=temperature, messages=st.session_state["messages"]
     )
     # st.write(response_object)
     response = response_object.choices[0].message.content
     # response = response_object.choices[0].text
-    st.session_state["messages"].append(
-        {"role": "assistant", "content": response})
+    st.session_state["messages"].append({"role": "assistant", "content": response})
     # response_object_json = response_object.model_dump_json(indent=2)
     # total_tokens = dict(response_object).get('usage').total_tokens
     # prompt_tokens = dict(response_object).get('usage').prompt_tokens
@@ -228,15 +263,16 @@ def chat_completion(prompt, temperature):
     return response, total_tokens, prompt_tokens, completion_tokens
     # return response_object
 
+
 # container for chat history
 response_container = st.container()
 # container for text box
 container = st.container()
 
 with container:
-    with st.form(key='my_form', clear_on_submit=True):
-        user_input = st.text_area("You:", key='input', height=100)
-        submit_button = st.form_submit_button(label='Send')
+    with st.form(key="my_form", clear_on_submit=True):
+        user_input = st.text_area("You:", key="input", height=100)
+        submit_button = st.form_submit_button(label="Send")
 
     if submit_button and user_input:
         if data_name == "Uploaded Files":
@@ -246,16 +282,17 @@ with container:
             completion_tokens = call_back.completion_tokens
         elif data_name == "Provide in Text Box":
             output, total_tokens, prompt_tokens, completion_tokens = chat_completion(
-                user_input, llm_temperature)
+                user_input, llm_temperature
+            )
             # response_object = chat_completion(user_input)
         else:
             st.write("Please select data.")
-        st.session_state['past'].append(user_input)
-        st.session_state['generated'].append(output)
-        st.session_state['model_name'].append(model_name)
-        st.session_state['data_name'].append(data_name)                                         
-        st.session_state['total_tokens'].append(total_tokens)
-        st.session_state['temperature'].append(llm_temperature)
+        st.session_state["past"].append(user_input)
+        st.session_state["generated"].append(output)
+        st.session_state["model_name"].append(model_name)
+        st.session_state["data_name"].append(data_name)
+        st.session_state["total_tokens"].append(total_tokens)
+        st.session_state["temperature"].append(llm_temperature)
 
         # from https://openai.com/pricing#language-models
         if model_name == "gpt-3.5-turbo":
@@ -263,16 +300,17 @@ with container:
         else:
             cost = (prompt_tokens * 0.03 + completion_tokens * 0.06) / 1000
 
-        st.session_state['cost'].append(cost)
-        st.session_state['total_cost'] += cost
+        st.session_state["cost"].append(cost)
+        st.session_state["total_cost"] += cost
 
-if st.session_state['generated']:
+if st.session_state["generated"]:
     with response_container:
-        for i in range(len(st.session_state['generated'])):
-            message(st.session_state["past"][i],
-                    is_user=True, key=str(i) + '_user')
+        for i in range(len(st.session_state["generated"])):
+            message(st.session_state["past"][i], is_user=True, key=str(i) + "_user")
             message(st.session_state["generated"][i], key=str(i))
             st.write(
-                f"Model used: {st.session_state['model_name'][i]}; Number of tokens: {st.session_state['total_tokens'][i]}; Cost: ${st.session_state['cost'][i]:.5f}; Data used: {st.session_state['data_name'][i]}; Temperature: {st.session_state['temperature'][i]}")
+                f"Model used: {st.session_state['model_name'][i]}; Number of tokens: {st.session_state['total_tokens'][i]}; Cost: ${st.session_state['cost'][i]:.5f}; Data used: {st.session_state['data_name'][i]}; Temperature: {st.session_state['temperature'][i]}"
+            )
             counter_placeholder.write(
-                f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}")
+                f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
+            )
