@@ -4,11 +4,11 @@ from streamlit_chat import message
 import os
 import PyPDF2
 from PIL import Image
-import pytesseract
-import easyocr
+# import pytesseract
+# import easyocr
 import codecs
 from io import StringIO, BytesIO
-import imageio.v3 as iio
+# import imageio.v3 as iio
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
