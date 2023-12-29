@@ -10,27 +10,27 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build:
-  runs-on: ubuntu-latest
+    name: Build
+    runs-on: ubuntu-latest
 
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
-      with:
-      python-version: "3.8"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      
+      - name: Install dependencies
+        run: |
+          make  install
+      
+      - name: Install requirements
+        run: |
+          make init
     
-    - name: Install dependencies
-      run: |
-        make  install
-    
-    - name: Install requirements
-      run: |
-        make init
-  
-     - name: Format code
-      run: |
-        make format
+      - name: Format code
+        run: |
+          make format
 
-    - name: Lint with pyLint
-      run: |
-        make lint
-    
+      - name: Lint with pyLint
+        run: |
+          make lint
