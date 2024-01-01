@@ -4,10 +4,12 @@ from streamlit_chat import message
 import os
 import PyPDF2
 from PIL import Image
+
 # import pytesseract
 # import easyocr
 import codecs
 from io import StringIO, BytesIO
+
 # import imageio.v3 as iio
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -106,26 +108,6 @@ embeddings = HuggingFaceEmbeddings(
     model_name=embedding_model, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
 )
 
-# Reset everything
-if clear_button:
-    st.session_state["generated"] = []
-    st.session_state["past"] = []
-    st.session_state["messages"] = [
-        {"role": "system", "content": "You are a helpful assistant."}
-    ]
-    st.session_state["model_name"] = []
-    st.session_state["data_name"] = []
-    st.session_state["cost"] = []
-    st.session_state["total_cost"] = 0.0
-    st.session_state["total_tokens"] = []
-    st.session_state["temperature"] = []
-    counter_placeholder.write(
-        f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
-    )
-    try:
-        Chroma.delect_collection()
-    except:
-        st.write("No Chroma collection is deleted.")
 
 # Split into smaller chunks
 splitter = RecursiveCharacterTextSplitter(
@@ -200,7 +182,10 @@ if data_name == "Uploaded Files":
         ]
         splits = splitter.split_documents(loaded_docs)
         chromadb = Chroma.from_documents(
-            documents=splits, embedding=embeddings, collection_name="uploaded_docs", anonymized_telemetry=False
+            documents=splits,
+            embedding=embeddings,
+            collection_name="uploaded_docs",
+            anonymized_telemetry=False,
         )
         retriever = chromadb.as_retriever()
         st.write(
@@ -212,6 +197,29 @@ elif data_name == "Provide in Text Box":
     st.write("Please provide your text in the chat box.")
 else:
     st.write("Please select data to chat.")
+
+
+# Reset everything
+if clear_button:
+    st.session_state["generated"] = []
+    st.session_state["past"] = []
+    st.session_state["messages"] = [
+        {"role": "system", "content": "You are a helpful assistant."}
+    ]
+    st.session_state["model_name"] = []
+    st.session_state["data_name"] = []
+    st.session_state["cost"] = []
+    st.session_state["total_cost"] = 0.0
+    st.session_state["total_tokens"] = []
+    st.session_state["temperature"] = []
+    counter_placeholder.write(
+        f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
+    )
+    try:
+        Chroma.delete_collection("uploaded_docs")
+    except:
+        st.write("No Chroma collection is deleted.")
+
 
 # Write prompt
 template = """
@@ -231,7 +239,9 @@ def generate_response(prompt, retriever, llm):
     st.session_state["messages"].append({"role": "user", "content": prompt})
     # Set up a RAG chain
     rag_chain = (
-        {"context": retriever, "question": RunnablePassthrough()} | prompt_template | llm
+        {"context": retriever, "question": RunnablePassthrough()}
+        | prompt_template
+        | llm
     )
     with get_openai_callback() as call_back:
         response_object = rag_chain.invoke(prompt)
