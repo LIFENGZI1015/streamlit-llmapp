@@ -19,7 +19,7 @@ from langchain.document_loaders import (
     UnstructuredFileLoader,
 )
 from langchain.document_loaders.image import UnstructuredImageLoader
-from langchain.vectorstores import Chroma
+from langchain.vectorstores.chroma import Chroma
 from langchain.prompts import PromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.document import Document
@@ -123,7 +123,7 @@ if clear_button:
         f"Total cost of this conversation: ${st.session_state['total_cost']:.5f}"
     )
     try:
-        Chroma.delect_collection("uploaded_docs")
+        Chroma.delect_collection()
     except:
         st.write("No Chroma collection is deleted.")
 
@@ -200,7 +200,7 @@ if data_name == "Uploaded Files":
         ]
         splits = splitter.split_documents(loaded_docs)
         chromadb = Chroma.from_documents(
-            documents=splits, embedding=embeddings, collection_name="uploaded_docs"
+            documents=splits, embedding=embeddings, collection_name="uploaded_docs", anonymized_telemetry=False
         )
         retriever = chromadb.as_retriever()
         st.write(
@@ -231,9 +231,7 @@ def generate_response(prompt, retriever, llm):
     st.session_state["messages"].append({"role": "user", "content": prompt})
     # Set up a RAG chain
     rag_chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt_template
-        | llm
+        {"context": retriever, "question": RunnablePassthrough()} | prompt_template | llm
     )
     with get_openai_callback() as call_back:
         response_object = rag_chain.invoke(prompt)
