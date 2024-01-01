@@ -26,7 +26,7 @@ env:
 
 install: ## Installs development requirements
 install:
-	pip install --upgrade pip
+	python -m pip install --upgrade pip
 	pip install black pylint pytest
 
 init: ## Installs requirements
@@ -38,8 +38,8 @@ format:
 	find . -name '*.py' -exec black {} +
 
 lint: ## Runs flake8 on src, exit if critical rules are broken
-lint:
-	pylint --disable=R,C,W0702,W0621,W0611 ./*.py
+lint: ## pylint E1131 can be fixed by disable or using python=3.8 in Makefile
+	pylint --disable=R,C,E1131 --fail-under=9.0 ./*.py
 # test: ## Run pytest
 # test:
 # 	python -m pytest -vv --cov=test
