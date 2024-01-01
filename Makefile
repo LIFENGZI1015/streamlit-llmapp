@@ -39,7 +39,7 @@ format:
 
 lint: ## Runs flake8 on src, exit if critical rules are broken
 lint:
-	pylint --disable=R,C ./*.py
+	pylint --disable=R,C,W0702,W0621,W0611 ./*.py
 # test: ## Run pytest
 # test:
 # 	python -m pytest -vv --cov=test

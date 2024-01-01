@@ -185,7 +185,7 @@ if data_name == "Uploaded Files":
             documents=splits,
             embedding=embeddings,
             collection_name="uploaded_docs",
-            anonymized_telemetry=False,
+            # anonymized_telemetry=False,
         )
         retriever = chromadb.as_retriever()
         st.write(
