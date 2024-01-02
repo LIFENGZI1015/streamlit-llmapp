@@ -133,3 +133,4 @@ dmypy.json
 
 # folders
 **/docs/
+**/uploaded_docs
