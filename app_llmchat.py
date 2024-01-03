@@ -4,13 +4,8 @@ from streamlit_chat import message
 import os
 import PyPDF2
 from PIL import Image
-
-# import pytesseract
-# import easyocr
 import codecs
 from io import StringIO, BytesIO
-
-# import imageio.v3 as iio
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -19,8 +14,11 @@ from langchain.document_loaders import (
     DirectoryLoader,
     TextLoader,
     UnstructuredFileLoader,
+    Docx2txtLoader,
 )
 from langchain.document_loaders.image import UnstructuredImageLoader
+
+# from langchain_community.document_loaders import UnstructuredImageLoader
 from langchain.vectorstores.chroma import Chroma
 from langchain.prompts import PromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
@@ -78,7 +76,6 @@ data_name = st.sidebar.radio(
 uploaded_files = st.sidebar.file_uploader(
     "Upload a file:", type=["pdf", "png", "jpg", "docx", "txt"]
 )
-add_file = st.button('Add File', on_click=clear_history)
 llm_temperature = st.sidebar.slider(
     "Creativity of model", min_value=0.0, max_value=1.0, value=None, step=0.1
 )
@@ -113,88 +110,65 @@ embeddings = HuggingFaceEmbeddings(
 
 # Split into smaller chunks
 splitter = RecursiveCharacterTextSplitter(
-    separators=["\n"], keep_separator=False, chunk_size=1000, chunk_overlap=50
+    separators=["\n", "\n\n"], keep_separator=False, chunk_size=1000, chunk_overlap=100
 )
 
 
-# Build a retriever over uploaded files
-def load_files(file_path):
-    loader = PyPDFLoader(file_path)
-    pdf_docs = loader.load()
-    return pdf_docs
+# Loader for different data format
+def file_loader(file_extension, file_name):
+    if file_extension == ".pdf":
+        loader = PyPDFLoader(file_name)
+    elif file_extension == ".docx":
+        loader = Docx2txtLoader(file_name)
+    elif file_extension == ".txt":
+        loader = TextLoader(file_name)
+    elif file_extension == ".png" or file_extension == ".jpg":
+        loader = UnstructuredImageLoader(file_name, mode="single")
+    else:
+        st.write("Document format is not supported.")
+    return loader
 
-
-def load_images(file_path):
-    loader = UnstructuredImageLoader(file_path)
-    img_data = loader.load()
-    return img_data
-
-
-def load_unstructured_files(file_path):
-    loader = UnstructuredFileLoader(file_path, mode="elements")
-    unstructured_data = loader.load()
-    return unstructured_data
-
-
-# from file objects
-# class MyFileObject:
-#     def read(size:int=-1):
-#         return bytes_image
-#     def close():
-#         return  # nothing to do
 
 # Re-build retriever
+chromadb = Chroma(
+    collection_name="uploaded_docs",
+    embedding_function=embeddings,
+    client_settings=Settings(anonymized_telemetry=False, is_persistent=False),
+)
 if data_name == "Uploaded Files":
-    if uploaded_files is not None:
-        try:
-            pdf_reader = PyPDF2.PdfReader(uploaded_files)
+    if uploaded_files:
+        with st.spinner("Loading file..."):
+            bytes_data = uploaded_files.read()
+            file_path = os.path.join("./uploaded_docs/", uploaded_files.name)
+            with open(file_path, "wb") as f:
+                f.write(bytes_data)
+
+            name, extension = os.path.splitext(file_path)
+            loader_file = file_loader(extension, file_path)
+            documents = loader_file.load()
             loaded_text = ""
-            for page in pdf_reader.pages:
-                loaded_text += page.extract_text() + "\n"
-        except:
-            try:
-                # bytes_data = uploaded_files.getvalue()
-                # bytes_image = iio.imwrite("<bytes>", frames)
-                stringio = StringIO(
-                    uploaded_files.getvalue().decode("utf-8", errors="ignore")
-                )
-                # st.write(stringio)
-                loaded_text = stringio.read()
-                # st.write(loaded_text)
-                # b_string = uploaded_files.getvalue()
-                # st.write(b_string)
-                # loaded_text = codecs.decode(b_string, 'UTF-8', errors='ignore')
-                # byte_stream = BytesIO(stringio)
-                ## pytesseract and easyocr accept stinrg path of image
-                # frames = iio.imread(byte_stream, index=None)
-                # image = Image.open(BytesIO(uploaded_files))
-                # loaded_text = pytesseract.image_to_string(image)
-                # reader = easyocr.Reader(['en'])
-                # ocr_result = reader.readtext(uploaded_files)
-                # st.write(ocr_result)
-                # loaded_text = ""
-                # for detection in ocr_result:
-                # loaded_text += detection[1] + " "
-            except:
-                st.write("Uploaded files in PDF, PNG, JPG JPEG only.")
-                loaded_text = ""
-        st.write(loaded_text)
-        loaded_docs = [
-            Document(page_content=x) for x in splitter.split_text(loaded_text)
-        ]
-        splits = splitter.split_documents(loaded_docs)
-        chromadb = Chroma.from_documents(
-            documents=splits,
-            embedding=embeddings,
-            collection_name="uploaded_docs",
-            client_settings=Settings(anonymized_telemetry=False, is_persistent=False)
-        )
-        retriever = chromadb.as_retriever()
-        st.write(
-            "Chatbot is reading your files and you can start talking to your data..."
-        )
+            for page in documents:
+                loaded_text += page.page_content + "\n"
+            st.write(loaded_text)
+            splits = splitter.split_documents(documents)
+
+            if chromadb:
+                chromadb.delete_collection()
+
+            chromadb = Chroma.from_documents(
+                documents=splits,
+                embedding=embeddings,
+                collection_name="uploaded_docs",
+                client_settings=Settings(
+                    anonymized_telemetry=False, is_persistent=False
+                ),
+            )
+            retriever = chromadb.as_retriever()
+            st.write(
+                "Chatbot is reading your files and you can start talking to your data..."
+            )
     else:
-        st.write("Please upload your files.")
+        st.write("Please upload your file and add file.")
 elif data_name == "Provide in Text Box":
     st.write("Please provide your text in the chat box.")
 else:
@@ -237,41 +211,33 @@ prompt_template = PromptTemplate(
 
 
 # Generate a response over uploaded data
-def generate_response(prompt, retriever, llm):
+def generate_response(prompt, data_retriever, llm_model):
     st.session_state["messages"].append({"role": "user", "content": prompt})
     # Set up a RAG chain
     rag_chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
+        {"context": data_retriever, "question": RunnablePassthrough()}
         | prompt_template
-        | llm
+        | llm_model
     )
-    with get_openai_callback() as call_back:
+    with get_openai_callback() as openai_call_back:
         response_object = rag_chain.invoke(prompt)
     response = response_object.content
     st.session_state["messages"].append({"role": "assistant", "content": response})
-    return response, call_back
+    return response, openai_call_back
 
 
 # Generate a response over context in text box
 def chat_completion(prompt, temperature):
     st.session_state["messages"].append({"role": "user", "content": prompt})
-    # response_object = client.completions.create(
     response_object = client.chat.completions.create(
         model=model_name, temperature=temperature, messages=st.session_state["messages"]
     )
-    # st.write(response_object)
     response = response_object.choices[0].message.content
-    # response = response_object.choices[0].text
     st.session_state["messages"].append({"role": "assistant", "content": response})
-    # response_object_json = response_object.model_dump_json(indent=2)
-    # total_tokens = dict(response_object).get('usage').total_tokens
-    # prompt_tokens = dict(response_object).get('usage').prompt_tokens
-    # completion_tokens = dict(response_object).get('usage').completion_tokens
     total_tokens = response_object.usage.total_tokens
     prompt_tokens = response_object.usage.prompt_tokens
     completion_tokens = response_object.usage.completion_tokens
     return response, total_tokens, prompt_tokens, completion_tokens
-    # return response_object
 
 
 # container for chat history
@@ -285,33 +251,36 @@ with container:
         submit_button = st.form_submit_button(label="Send")
 
     if submit_button and user_input:
-        if data_name == "Uploaded Files":
-            output, call_back = generate_response(user_input, retriever, llm)
-            total_tokens = call_back.total_tokens
-            prompt_tokens = call_back.prompt_tokens
-            completion_tokens = call_back.completion_tokens
-        elif data_name == "Provide in Text Box":
-            output, total_tokens, prompt_tokens, completion_tokens = chat_completion(
-                user_input, llm_temperature
-            )
-            # response_object = chat_completion(user_input)
-        else:
-            st.write("Please select data.")
-        st.session_state["past"].append(user_input)
-        st.session_state["generated"].append(output)
-        st.session_state["model_name"].append(model_name)
-        st.session_state["data_name"].append(data_name)
-        st.session_state["total_tokens"].append(total_tokens)
-        st.session_state["temperature"].append(llm_temperature)
+        with st.spinner("GenieBot is working on your question..."):
+            if data_name == "Uploaded Files":
+                output, call_back = generate_response(user_input, retriever, llm)
+                total_tokens = call_back.total_tokens
+                prompt_tokens = call_back.prompt_tokens
+                completion_tokens = call_back.completion_tokens
+            elif data_name == "Provide in Text Box":
+                (
+                    output,
+                    total_tokens,
+                    prompt_tokens,
+                    completion_tokens,
+                ) = chat_completion(user_input, llm_temperature)
+            else:
+                st.write("Please select data.")
+            st.session_state["past"].append(user_input)
+            st.session_state["generated"].append(output)
+            st.session_state["model_name"].append(model_name)
+            st.session_state["data_name"].append(data_name)
+            st.session_state["total_tokens"].append(total_tokens)
+            st.session_state["temperature"].append(llm_temperature)
 
-        # from https://openai.com/pricing#language-models
-        if model_name == "gpt-3.5-turbo":
-            cost = total_tokens * 0.002 / 1000
-        else:
-            cost = (prompt_tokens * 0.03 + completion_tokens * 0.06) / 1000
+            # from https://openai.com/pricing#language-models
+            if model_name == "gpt-3.5-turbo":
+                cost = total_tokens * 0.002 / 1000
+            else:
+                cost = (prompt_tokens * 0.03 + completion_tokens * 0.06) / 1000
 
-        st.session_state["cost"].append(cost)
-        st.session_state["total_cost"] += cost
+            st.session_state["cost"].append(cost)
+            st.session_state["total_cost"] += cost
 
 if st.session_state["generated"]:
     with response_container:

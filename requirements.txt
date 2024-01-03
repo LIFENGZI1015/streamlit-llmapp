@@ -13,12 +13,7 @@ PyPDF2==3.0.1
 langchain==0.0.337
 sentence-transformers==2.2.2
 pillow==10.1.0
-unstructured==0.11.6
+unstructured==0.11.6 #pip install "unstructured[all-docs]"
 pdf2image==1.16.3
 pdfminer.six==20231228
-#pytesseract==0.3.10
-#easyocr==1.7.1
-#imageio==2.33.0
-# black==23.12.1
-# pylint==3.0.3
-# pytest==7.4.3
+pytesseract==0.3.10 #https://pypi.org/project/pytesseract/, https://tesseract-ocr.github.io/tessdoc/Installation.html, https://stackoverflow.com/questions/50951955/pytesseract-tesseractnotfound-error-tesseract-is-not-installed-or-its-not-i

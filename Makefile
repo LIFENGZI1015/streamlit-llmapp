@@ -28,7 +28,9 @@ install: ## Installs development requirements
 install:
 	python -m pip install --upgrade pip
 	pip install black pylint pytest
-
+	sudo apt install tesseract-ocr
+	sudo apt install libtesseract-dev
+	
 init: ## Installs requirements
 init:
 	pip install -r requirements.txt
