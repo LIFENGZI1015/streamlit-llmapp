@@ -1,11 +1,15 @@
 version: '1'
 services:
-  app:
+  llmchat-app:
+    image: llmchat-app:latest
     build:
       context: .
     ports:
       - 8501:8501
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: streamlit run app_llmchat.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - ./uploaded_docs:/app/uploaded_docs
     # depends_on:
     #   -db

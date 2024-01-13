@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM python:3.8-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
@@ -6,17 +6,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     software-properties-common \
     git \
+    tesseract-ocr libgl1 \
+    # ffmpeg libsm6 libxext6 libgl1 \
+    #libleptonica-dev tesseract-ocr libtesseract-dev python3-pil tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
-RUN sudo apt install tesseract-ocr
+# RUN git clone https://github.com/LIFENGZI1015/streamlit-llmapp.git .
 
-RUN sudo apt install libtesseract-dev
+COPY . .
 
-RUN git clone https://github.com/LIFENGZI1015/streamlit-llmapp.git .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-RUN pip install --upgrade pip
+RUN pip install "unstructured[all-docs]" 
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN 
 
 EXPOSE 8501
 
