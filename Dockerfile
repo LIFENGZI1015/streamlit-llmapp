@@ -19,8 +19,6 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 RUN pip install "unstructured[all-docs]" 
 
-RUN 
-
 EXPOSE 8501
 
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health

@@ -49,3 +49,9 @@ docker compose stop
 ```
 3. Ctrl+C to stop everything
 
+### References
+- https://www.packtpub.com/article-hub/building-a-containerized-llm-chatbot-application
+- https://docs.streamlit.io/knowledge-base/tutorials/deploy/docker
+- https://www.docker.com/blog/build-and-deploy-a-langchain-powered-chat-app-with-docker-and-streamlit/
+
+
