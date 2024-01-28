@@ -51,7 +51,7 @@ docker compose stop
 3. Ctrl+C to stop everything
 
 
-## Deploy to Huggingface SpaceS via Docker SDK
+## Deploy to Huggingface Spaces via Docker Space SDK
 ![Alt text](./images/huggingface_streamlit_llm_app.png)
 
 1. Create Spaces in your Huggingface account
