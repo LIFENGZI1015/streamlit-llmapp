@@ -76,3 +76,4 @@ Please note that Dockerfile_hf in this repo is used to deploy streamlit llm app 
 - https://www.docker.com/blog/build-machine-learning-apps-with-hugging-faces-docker-spaces/
 - https://huggingface.co/blog/HemanthSai7/deploy-applications-on-huggingface-spaces
 - https://huggingface.co/docs/hub/spaces-sdks-docker#secret-management
+- https://www.docker.com/blog/build-machine-learning-apps-with-hugging-faces-docker-spaces/
