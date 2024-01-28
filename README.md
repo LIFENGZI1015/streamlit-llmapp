@@ -8,12 +8,12 @@ A LLM Chat application built using streamlit with features to select LLM models,
 ### Components
 - A Chatbot using LangChain, Streamlit and LLMs like OpenAI GPTs
 - It can be run locally or using Docker
-- It can be deployed to Huggingface space via Docker Space SDK
+- It can be deployed to Huggingface Spaces via Docker Space SDK
 
 ## Pre-requisites
 - OpenAI API Key
 - Docker (if using this option)
-- Huggingface account (if deploy to Huggingface Space)
+- Huggingface account (if deploy to Huggingface Spaces)
 
 
 ## Running Locally
@@ -51,16 +51,16 @@ docker compose stop
 3. Ctrl+C to stop everything
 
 
-## Deploy to Huggingface Space via Docker SDK
+## Deploy to Huggingface SpaceS via Docker SDK
 ![Alt text](./images/huggingface_streamlit_llm_app.png)
 
-1. Create Space in your Huggingface account
+1. Create Spaces in your Huggingface account
 - https://huggingface.co/docs/hub/spaces-overview
 
-2. Add OPENAI_API_KEY as secret in the Space Settings
+2. Add OPENAI_API_KEY as secret in the Spaces Settings
 - https://huggingface.co/docs/hub/spaces-overview#managing-secrets
 
-3. Upload or create following files to Huggingface Space
+3. Upload or create following files to Huggingface Spaces
 ![Alt text](./images/huggingface_space_files.png)
 
 Please note that Dockerfile_hf in this repo is used to deploy streamlit llm app on Huggingface. Change name when you upload it to Huggingface.
@@ -71,7 +71,7 @@ Please note that Dockerfile_hf in this repo is used to deploy streamlit llm app 
 - https://www.packtpub.com/article-hub/building-a-containerized-llm-chatbot-application
 - https://docs.streamlit.io/knowledge-base/tutorials/deploy/docker
 - https://www.docker.com/blog/build-and-deploy-a-langchain-powered-chat-app-with-docker-and-streamlit/
-2. Deploy Docker App in Huggingface Space
+2. Deploy Docker App in Huggingface Spaces
 - https://huggingface.co/docs/hub/spaces-sdks-docker-first-demo
 - https://www.docker.com/blog/build-machine-learning-apps-with-hugging-faces-docker-spaces/
 - https://huggingface.co/blog/HemanthSai7/deploy-applications-on-huggingface-spaces
