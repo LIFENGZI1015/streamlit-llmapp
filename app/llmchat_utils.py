@@ -1,7 +1,6 @@
 from openai import OpenAI
 import os
 import PyPDF2
-from PIL import Image
 import codecs
 from io import StringIO, BytesIO
 from langchain.chat_models import ChatOpenAI
@@ -32,13 +31,23 @@ client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
 
-model_name = "gpt-4"
 
-llm = ChatOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    model_name="gpt-4",
-    temperature=0,
-)
+def select_llm(model_name):
+    # Map model names to OpenAI model IDs
+    if model_name == "gpt-3.5-turbo":
+        llm = ChatOpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY"),
+            model_name="gpt-3.5-turbo",
+            temperature=0,
+        )
+    else:
+        llm = ChatOpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY"),
+            model_name="gpt-4",
+            temperature=0,
+        )
+    return llm
+
 
 # Vectordb embedding model
 embedding_model = "sentence-transformers/all-mpnet-base-v2"
@@ -47,6 +56,7 @@ encode_kwargs = {"normalize_embeddings": False}
 embeddings = HuggingFaceEmbeddings(
     model_name=embedding_model, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
 )
+
 
 # Split into smaller chunks
 splitter = RecursiveCharacterTextSplitter(
@@ -78,7 +88,10 @@ def build_retriver(uploaded_files):
     )
 
     bytes_data = uploaded_files.read()
-    file_path = os.path.join("./uploaded_docs/", uploaded_files.name)
+    if uploaded_files.name:
+        file_path = os.path.join("./uploaded_docs/", uploaded_files.name)
+    else:
+        file_path = os.path.join("./uploaded_docs/", uploaded_files.filename)
     with open(file_path, "wb") as f:
         f.write(bytes_data)
 
@@ -132,7 +145,7 @@ def generate_response(prompt, data_retriever, llm_model):
 
 
 # Generate a response over context in text box
-def chat_completion(prompt, temperature):
+def chat_completion(prompt, temperature, model_name):
     response_object = client.chat.completions.create(
         model=model_name,
         temperature=temperature,
@@ -143,3 +156,12 @@ def chat_completion(prompt, temperature):
     prompt_tokens = response_object.usage.prompt_tokens
     completion_tokens = response_object.usage.completion_tokens
     return response, total_tokens, prompt_tokens, completion_tokens
+
+
+def calculate_cost(model_name, total_tokens, prompt_tokens, completion_tokens):
+    # from https://openai.com/pricing#language-models
+    if model_name == "gpt-3.5-turbo":
+        cost = total_tokens * 0.002 / 1000
+    else:
+        cost = (prompt_tokens * 0.03 + completion_tokens * 0.06) / 1000
+    return cost

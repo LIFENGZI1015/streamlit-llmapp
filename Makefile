@@ -34,6 +34,8 @@ install:
 init: ## Installs requirements
 init:
 	pip install -r requirements.txt
+	pip install "unstructured[all-docs]"
+	pip install "fastapi[all]"
 
 format: ## Formats the code with autopep8 
 format:
