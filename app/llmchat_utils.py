@@ -31,7 +31,6 @@ client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
 
-
 def select_llm(model_name):
     # Map model names to OpenAI model IDs
     if model_name == "gpt-3.5-turbo":
@@ -87,10 +86,11 @@ def build_retriver(uploaded_files):
         client_settings=Settings(anonymized_telemetry=False, is_persistent=False),
     )
 
-    bytes_data = uploaded_files.read()
-    if uploaded_files.name:
+    bytes_data = uploaded_files.file.read()
+
+    try:
         file_path = os.path.join("./uploaded_docs/", uploaded_files.name)
-    else:
+    except:
         file_path = os.path.join("./uploaded_docs/", uploaded_files.filename)
     with open(file_path, "wb") as f:
         f.write(bytes_data)
@@ -145,10 +145,10 @@ def generate_response(prompt, data_retriever, llm_model):
 
 
 # Generate a response over context in text box
-def chat_completion(prompt, temperature, model_name):
+def chat_completion(prompt, model_name):
     response_object = client.chat.completions.create(
         model=model_name,
-        temperature=temperature,
+        temperature=0,
         messages={"role": "user", "content": prompt},
     )
     response = response_object.choices[0].message.content

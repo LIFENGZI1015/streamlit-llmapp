@@ -76,6 +76,10 @@ Please note that Dockerfile_hf in this repo is used to deploy streamlit llm app 
 uvicorn app.fastapi_app:app --reload --env-file .env
 ```
 Once the server is running, you can access the Swagger documentation by visiting http://127.0.0.1:8000/docs in your web browser. The Swagger UI provides an interactive interface to test your API.
+
+![Alt text](./images/fastapi_docs_ui.png)
+![Alt text](./images/fastapi_llm_ans.png)
+
 2. Option 1 - Call API in python scripts:
 ```
 python run_fastapi.py
