@@ -26,10 +26,12 @@ from chromadb import Settings
 
 load_dotenv()
 
+
 # Initiate openai client
 client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
 )
+
 
 def select_llm(model_name):
     # Map model names to OpenAI model IDs
@@ -78,29 +80,33 @@ def file_loader(file_extension, file_name):
     return loader
 
 
-def build_retriver(uploaded_files):
+def load_multi_docs(file_list):
+    documents = []
+
+    for file in file_list:
+        bytes_data = file.file.read()
+
+        try:
+            file_path = os.path.join("./uploaded_docs/", file.name)
+        except:
+            file_path = os.path.join("./uploaded_docs/", file.filename)
+        with open(file_path, "wb") as f:
+            f.write(bytes_data)
+
+        _, extension = os.path.splitext(file_path)
+        loader_file = file_loader(extension, file_path)
+        documents.extend(loader_file.load())
+
+    return documents
+
+
+def build_retriver(documents):
     # Re-build retriever
     chromadb = Chroma(
         collection_name="uploaded_docs",
         embedding_function=embeddings,
         client_settings=Settings(anonymized_telemetry=False, is_persistent=False),
     )
-
-    bytes_data = uploaded_files.file.read()
-
-    try:
-        file_path = os.path.join("./uploaded_docs/", uploaded_files.name)
-    except:
-        file_path = os.path.join("./uploaded_docs/", uploaded_files.filename)
-    with open(file_path, "wb") as f:
-        f.write(bytes_data)
-
-    _, extension = os.path.splitext(file_path)
-    loader_file = file_loader(extension, file_path)
-    documents = loader_file.load()
-    loaded_text = ""
-    for page in documents:
-        loaded_text += page.page_content + "\n"
 
     splits = splitter.split_documents(documents)
 
@@ -145,11 +151,14 @@ def generate_response(prompt, data_retriever, llm_model):
 
 
 # Generate a response over context in text box
-def chat_completion(prompt, model_name):
+def chat_completion(content, question, model_name):
+    prompt = content + question
+    messages = []
+    messages.append({"role": "user", "content": prompt})
     response_object = client.chat.completions.create(
         model=model_name,
         temperature=0,
-        messages={"role": "user", "content": prompt},
+        messages=messages,
     )
     response = response_object.choices[0].message.content
     total_tokens = response_object.usage.total_tokens

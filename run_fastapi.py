@@ -20,10 +20,7 @@ def main():
     response = requests.post(
         url=url,
         files=files,
-        data={
-            # "text":"",
-            "question": question
-        },
+        data={"text": "", "question": question},
     )
     print(response.json())
 

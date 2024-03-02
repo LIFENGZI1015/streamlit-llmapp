@@ -20,33 +20,39 @@ async def create_upload_files(
 ):
     content = ""
 
-    for file in files:
-        content += (
-            f"Uploaded File Content ({file.filename}):\n{file.read()}\n"
-        )
-    if text is None:
+    if files is not None:
+        for file in files:
+            content += f"Uploaded File Content ({file.filename}):\n{file.read()}\n"
+    else:
+        pass
+    if text is not None:
         content += f"User Provided Text:\n{text}\n"
+    else:
+        pass
 
     if content is not None:
         pass
     else:
         print("Please provide data by uploading files or provide as text input.")
 
-    if len(files)!=0 and text is None:
-        retriever = build_retriver(files[0])
+    if files is not None and text is None:
+        documents = load_multi_docs(files)
+        retriever = build_retriver(documents)
         output, call_back = generate_response(
             prompt=question, data_retriever=retriever, llm_model=llm
         )
         total_tokens = call_back.total_tokens
         prompt_tokens = call_back.prompt_tokens
         completion_tokens = call_back.completion_tokens
-    elif len(files)==0 and text is not None:
+    elif files is None and text is not None:
         (
             output,
             total_tokens,
             prompt_tokens,
             completion_tokens,
-        ) = chat_completion(text, model_name)  
+        ) = chat_completion(text, question, model_name)
+    else:
+        print("Please provide data by uploading files or provide as text input.")
 
     cost = calculate_cost(model_name, total_tokens, prompt_tokens, completion_tokens)
 
